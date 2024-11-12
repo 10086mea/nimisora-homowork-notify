@@ -8,7 +8,7 @@ from data_fetch import fetch_semester_info, fetch_user_info, fetch_course_list, 
 from email_util import select_remind_homework
 
 CSV_FILE_PATH = 'user_data.csv'  # CSV文件路径
-
+csv_file_path = 'class_log.csv'
 
 def load_users_from_csv(file_path):
     """从CSV文件加载用户信息，读取学号、邮箱、上次提醒时间和提醒阈值。"""
@@ -72,7 +72,7 @@ def check_and_send_reminders():
             course_list,
             user_info,
         )
-        select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified)
+        select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified,csv_file_path,student_id)
 
         # 更新提醒时间为当前时间
         user["last_notified"] = current_time
@@ -85,7 +85,7 @@ def check_and_send_reminders():
 # 启动时立即执行一次检查
 check_and_send_reminders()
 
-# 设置定时任务每隔1小时执行一次
+# 设置定时任务每隔15分钟执行一次
 schedule.every(15).minutes.do(check_and_send_reminders)
 
 if __name__ == "__main__":
