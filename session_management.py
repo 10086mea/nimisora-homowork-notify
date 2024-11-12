@@ -6,7 +6,7 @@ from utils import md5
 def initialize_session(base_url):
     """初始化会话并获取初始的cookie和JSESSIONID。"""
     session = requests.Session()
-    captcha_url_png = f"{base_url}/ve/GetImg"
+    captcha_url_png = f"{base_url}/GetImg"
 
     # 获取初始cookie
     session.get(captcha_url_png)

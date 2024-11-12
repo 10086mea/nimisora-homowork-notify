@@ -5,16 +5,20 @@ from datetime import datetime, timedelta
 from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAGE
 import base64
 import json
+import csv
 
 
-def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified):
+def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified, csv_file_path,
+                           student_id):
     """
-    检查作业数据并根据提醒阈值条件筛选出需要提醒的作业项。
+    检查作业数据并根据提醒阈值条件筛选出需要提醒的作业项，并保存到CSV文件。
 
     :param homework_data_json: JSON格式的所有课程作业数据
     :param to_email: 用户邮箱，用于发送提醒
     :param reminder_threshold_hours: 提前多少小时提醒的阈值列表（第一个值为普通提醒阈值，第二个值为紧急提醒阈值）
     :param last_notified: 上次通知时间，格式为 "%Y-%m-%d %H:%M:%S"
+    :param csv_file_path: 用于保存提醒内容的CSV文件路径
+    :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
     current_time = datetime.now()
     email_reminders = {"normal": [], "urgent": []}
@@ -34,11 +38,15 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
                 # 如果结束时间为0点0分0秒，将其调整为前一天晚上23点59分59秒
                 if end_time and end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
                     end_time -= timedelta(seconds=1)
+                    # 将调整后的时间重新格式化为字符串并更新到原始数据
+                    homework_info["结束时间"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
             except ValueError:
                 end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M") if end_time_str else None
                 # 再次检查0点0分的情况
                 if end_time and end_time.hour == 0 and end_time.minute == 0:
                     end_time -= timedelta(seconds=1)
+                    # 将调整后的时间重新格式化为字符串并更新到原始数据
+                    homework_info["结束时间"] = end_time.strftime("%Y-%m-%d %H:%M")
 
             # 检查作业是否未提交
             if homework_info["提交状态"] == "未提交" and end_time:
@@ -50,17 +58,98 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
                 elif time_remaining < reminder_threshold_hours[0] * 3600:  # 普通提醒
                     email_reminders["normal"].append((course_name, homework_info))
 
-    # 比较当前提醒状态和上次提醒时间的状态变化
-    if (email_reminders["urgent"] or email_reminders["normal"]):
-        # 判断是否有紧急程度变化
+    # 获取上次的提醒内容
+    last_reminders = load_last_reminders(student_id, csv_file_path)
+
+    # 判断当前提醒内容与上次是否相同
+    if not compare_reminders(email_reminders, last_reminders):
+        # 保存新提醒内容到 CSV 文件
+        save_reminders_to_csv(email_reminders, csv_file_path, student_id)
+
+        # 判断是否发送提醒
         if current_time > last_notified_time:
             send_summary_email(email_reminders, to_email)
-            print("紧急程度有变化，需要提醒")
+            print("紧急程度或普通提醒有变化，需要提醒")
             return email_reminders  # 返回提醒内容
     else:
-        print("紧急程度无变化")
+        print("提醒内容没有变化")
         return None  # 无需提醒
 
+
+def compare_reminders(current_reminders, last_reminders):
+    """
+    比较当前提醒内容和上次提醒内容，仅比较关键字段。
+    :param current_reminders: 当前生成的提醒内容
+    :param last_reminders: 上次保存的提醒内容
+    :return: 布尔值，表示是否相同
+    """
+    for reminder_type in ["urgent", "normal"]:
+        current_set = {
+            (course_name, info.get("作业标题") or info.get("作业名称"), info.get("结束时间"), info.get("提交状态"))
+            for course_name, info in current_reminders[reminder_type]
+        }
+        last_set = {
+            (course_name, info.get("作业标题") or info.get("作业名称"), info.get("结束时间"), info.get("提交状态"))
+            for course_name, info in last_reminders[reminder_type]
+        }
+
+        if current_set != last_set:
+            return False
+    return True
+
+def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
+    """
+    将提醒内容保存到 CSV 文件中。
+
+    :param email_reminders: 包含 "urgent" 和 "normal" 作业的字典
+    :param csv_file_path: CSV 文件的保存路径
+    :param student_id: 学生学号，用于根据学号保存不同的CSV文件
+    """
+    fieldnames = ["课程名称", "作业标题", "结束时间", "提交状态", "提醒类型"]
+
+    # 打开 CSV 文件并写入数据
+    with open(f"{student_id}_{csv_file_path}", mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+        # 写入表头
+        writer.writeheader()
+
+        # 将 urgent 和 normal 列表的数据写入 CSV
+        for reminder_type in ["urgent", "normal"]:
+            for course_name, homework_info in email_reminders[reminder_type]:
+                reminder_data = {
+                    "课程名称": course_name,
+                    "作业标题": homework_info.get("作业标题", ""),
+                    "结束时间": homework_info.get("结束时间", ""),
+                    "提交状态": homework_info.get("提交状态", ""),
+                    "提醒类型": reminder_type
+                }
+                writer.writerow(reminder_data)
+
+
+def load_last_reminders(student_id, csv_file_path):
+    """
+    从 CSV 文件加载上次的提醒内容。
+
+    :param student_id: 学生学号，用于根据学号加载对应的CSV文件
+    :param csv_file_path: CSV 文件的保存路径
+    :return: 上次提醒的内容，格式为 {"normal": [], "urgent": []}
+    """
+    reminders = {"normal": [], "urgent": []}
+    try:
+        with open(f"{student_id}_{csv_file_path}", mode='r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                reminder_type = row["提醒类型"]
+                reminders[reminder_type].append((row["课程名称"], {
+                    "作业标题": row["作业标题"],
+                    "结束时间": row["结束时间"],
+                    "提交状态": row["提交状态"]
+                }))
+    except FileNotFoundError:
+        # 如果文件不存在，则返回空提醒内容
+        pass
+    return reminders
 
 def send_summary_email(email_reminders, to_email):
     """
