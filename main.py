@@ -86,10 +86,10 @@ def check_and_send_reminders():
 check_and_send_reminders()
 
 # 设置定时任务每隔1小时执行一次
-schedule.every(1).hour.do(check_and_send_reminders)
+schedule.every(15).minutes.do(check_and_send_reminders)
 
 if __name__ == "__main__":
-    print("定时任务启动，启动时立即检查一次，之后每隔1小时检查一次...")
+    print("定时任务启动，启动时立即检查一次，之后每隔15分钟检查一次...")
     while True:
         schedule.run_pending()
         time.sleep(1)

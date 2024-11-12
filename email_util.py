@@ -6,6 +6,7 @@ from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAG
 import base64
 import json
 
+
 def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified):
     """
     检查作业数据并根据提醒阈值条件筛选出需要提醒的作业项。
@@ -13,10 +14,13 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
     :param homework_data_json: JSON格式的所有课程作业数据
     :param to_email: 用户邮箱，用于发送提醒
     :param reminder_threshold_hours: 提前多少小时提醒的阈值列表（第一个值为普通提醒阈值，第二个值为紧急提醒阈值）
-    :param last_notified: 上次通知时间
+    :param last_notified: 上次通知时间，格式为 "%Y-%m-%d %H:%M:%S"
     """
     current_time = datetime.now()
     email_reminders = {"normal": [], "urgent": []}
+
+    # 将字符串形式的上次通知时间转换为 datetime 对象
+    last_notified_time = last_notified
 
     # 将JSON格式的作业数据解析为Python对象
     all_courses_homework_data = json.loads(homework_data_json)
@@ -26,26 +30,37 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
         for homework_info in homeworks:
             end_time_str = homework_info.get("结束时间")
             try:
-                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M") if end_time_str else None
-            except ValueError:
                 end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S") if end_time_str else None
+                # 如果结束时间为0点0分0秒，将其调整为前一天晚上23点59分59秒
+                if end_time and end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
+                    end_time -= timedelta(seconds=1)
+            except ValueError:
+                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M") if end_time_str else None
+                # 再次检查0点0分的情况
+                if end_time and end_time.hour == 0 and end_time.minute == 0:
+                    end_time -= timedelta(seconds=1)
 
             # 检查作业是否未提交
             if homework_info["提交状态"] == "未提交" and end_time:
                 time_remaining = (end_time - current_time).total_seconds()  # 剩余时间，单位为秒
 
                 # 根据时间阈值分类提醒类型
-                if time_remaining < reminder_threshold_hours[1]*3600:  # 紧急提醒
+                if time_remaining < reminder_threshold_hours[1] * 3600:  # 紧急提醒
                     email_reminders["urgent"].append((course_name, homework_info))
-                elif time_remaining < reminder_threshold_hours[0]*3600:  # 普通提醒
+                elif time_remaining < reminder_threshold_hours[0] * 3600:  # 普通提醒
                     email_reminders["normal"].append((course_name, homework_info))
 
-    # 如果有需要发送的邮件提醒
-    if email_reminders["urgent"] or email_reminders["normal"]:
-        send_summary_email(email_reminders, to_email)
-        return email_reminders  # 返回提醒内容
+    # 比较当前提醒状态和上次提醒时间的状态变化
+    if (email_reminders["urgent"] or email_reminders["normal"]):
+        # 判断是否有紧急程度变化
+        if current_time > last_notified_time:
+            send_summary_email(email_reminders, to_email)
+            print("紧急程度有变化，需要提醒")
+            return email_reminders  # 返回提醒内容
     else:
+        print("紧急程度无变化")
         return None  # 无需提醒
+
 
 def send_summary_email(email_reminders, to_email):
     """

@@ -1,7 +1,6 @@
 # data_fetch.py
 
 import json
-from datetime import datetime
 
 
 def fetch_semester_info(session, base_url, jsessionid):
@@ -79,13 +78,11 @@ def fetch_homework_data(session, base_url, course_list, user_info):
 
             course_homeworks = []
             for homework in homeworks:
-                end_time_str = homework.get("end_time")
-
                 homework_info = {
                     "作业标题": homework.get("title"),
                     "创建日期": homework.get("create_date"),
                     "开放时间": homework.get("open_date"),
-                    "结束时间": end_time_str,
+                    "结束时间": homework.get("end_time"),
                     "提交状态": homework.get("subStatus"),
                     "分数": homework.get("stu_score")
                 }
