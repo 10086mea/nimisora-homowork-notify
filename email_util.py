@@ -167,7 +167,11 @@ def send_summary_email(email_reminders, to_email):
             """
 
     body += f"""
+        
           <p>不要忘了交作业哦~</p>
+          <br><br> <!-- 额外空行 -->
+          <br><br> <!-- 额外空行 -->
+          <br><br> <!-- 额外空行 -->
         </div>
         <div class="footer">
         </div>
