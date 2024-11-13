@@ -59,42 +59,92 @@ def fetch_course_list(session, base_url, jsessionid, xq_code):
         return courses
     else:
         raise Exception("获取课程列表失败。")
+import time
+import requests
+import json
+from requests.exceptions import RequestException, JSONDecodeError
 
-def fetch_homework_data(session, base_url, course_list, user_info):
-    """获取所有课程的作业数据"""
+def fetch_homework_data(session, base_url, course_list, user_info, max_retries=3, backoff_factor=1):
+    """获取所有课程的作业数据，带重试机制"""
     all_courses_homework_data = {}
 
+    def fetch_homework_data_for_course(course_name, url, retries):
+        """发送请求并获取作业数据，带重试机制"""
+        while retries < max_retries:
+            try:
+                response = session.get(url)
+                response.raise_for_status()  # 如果响应码不是200，抛出异常
+
+                # 尝试解析 JSON
+                homework_data = response.json()
+                return homework_data.get("courseNoteList", [])
+            except (RequestException, JSONDecodeError) as e:
+                retries += 1
+                if retries < max_retries:
+                    print(f"请求失败，第 {retries} 次重试，课程：{course_name} 错误: {e}")
+                    time.sleep(backoff_factor * retries)  # 等待后重试
+                else:
+                    print(f"请求失败，已达到最大重试次数 ({max_retries})，课程：{course_name}，错误: {e}")
+                    return []  # 如果达到最大重试次数，返回空列表
 
     # 遍历所有课程
     for course in course_list:
         course_name = course['name']
-        homework_url = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=0&page=1&pagesize=100"
 
-        homework_response = session.get(homework_url)
+        # 定义不同类型作业的URL
+        homework_url_0 = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=0&page=1&pagesize=100"
+        homework_url_1 = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=1&page=1&pagesize=100"
+        homework_url_2 = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=2&page=1&pagesize=100"
 
-        if homework_response.status_code == 200:
-            homework_data = homework_response.json()
-            homeworks = homework_data.get("courseNoteList", [])
+        # 获取不同类型的作业数据
+        course_homeworks = []
 
-            course_homeworks = []
-            for homework in homeworks:
-                homework_info = {
-                    "作业标题": homework.get("title"),
-                    "创建日期": homework.get("create_date"),
-                    "开放时间": homework.get("open_date"),
-                    "结束时间": homework.get("end_time"),
-                    "提交状态": homework.get("subStatus"),
-                    "分数": homework.get("stu_score")
-                }
-                course_homeworks.append(homework_info)
+        # 获取作业类型 0（普通作业）
+        homeworks_0 = fetch_homework_data_for_course(course_name, homework_url_0, retries=0)
+        for homework in homeworks_0:
+            homework_info = {
+                "作业标题": homework.get("title"),
+                "创建日期": homework.get("create_date"),
+                "开放时间": homework.get("open_date"),
+                "结束时间": homework.get("end_time"),
+                "提交状态": homework.get("subStatus"),
+                "分数": homework.get("stu_score")
+            }
+            course_homeworks.append(homework_info)
 
+        # 获取作业类型 1（课程报告）
+        homeworks_1 = fetch_homework_data_for_course(course_name, homework_url_1, retries=0)
+        for homework in homeworks_1:
+            homework_info = {
+                "作业标题": homework.get("title"),
+                "创建日期": homework.get("create_date"),
+                "开放时间": homework.get("open_date"),
+                "结束时间": homework.get("end_time"),
+                "提交状态": homework.get("subStatus"),
+                "分数": homework.get("stu_score")
+            }
+            course_homeworks.append(homework_info)
 
+        # 获取作业类型 2（实验）
+        homeworks_2 = fetch_homework_data_for_course(course_name, homework_url_2, retries=0)
+        for homework in homeworks_2:
+            homework_info = {
+                "作业标题": homework.get("title"),
+                "创建日期": homework.get("create_date"),
+                "开放时间": homework.get("open_date"),
+                "结束时间": homework.get("end_time"),
+                "提交状态": homework.get("subStatus"),
+                "分数": homework.get("stu_score")
+            }
+            course_homeworks.append(homework_info)
 
+        # 将课程的作业数据添加到总数据字典中
+        if course_homeworks:
             all_courses_homework_data[course_name] = course_homeworks
         else:
-            print(f"获取课程 {course_name} 的作业信息失败")
+            print(f"课程 {course_name} 无作业数据")
 
-
-
+    # 转换为 JSON 格式
     all_courses_homework_json = json.dumps(all_courses_homework_data, ensure_ascii=False, indent=4)
     return all_courses_homework_json
+
