@@ -7,7 +7,6 @@ import base64
 import json
 import csv
 
-
 def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified, csv_file_path,
                            student_id):
     """
@@ -21,7 +20,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
     current_time = datetime.now()
-    email_reminders = {"normal": [], "urgent": []}
+    email_reminders = {"normal": [], "urgent": [], "out_of_threshold": []}  # 新增 "out_of_threshold" 类别
 
     # 将字符串形式的上次通知时间转换为 datetime 对象
     last_notified_time = last_notified
@@ -51,12 +50,16 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
             # 检查作业是否未提交
             if homework_info["提交状态"] == "未提交" and end_time:
                 time_remaining = (end_time - current_time).total_seconds()  # 剩余时间，单位为秒
-
                 # 根据时间阈值分类提醒类型
-                if time_remaining < reminder_threshold_hours[1] * 3600:  # 紧急提醒
-                    email_reminders["urgent"].append((course_name, homework_info))
-                elif time_remaining < reminder_threshold_hours[0] * 3600:  # 普通提醒
-                    email_reminders["normal"].append((course_name, homework_info))
+                if time_remaining >= 0:  # 确保剩余时间为非负数
+                    if time_remaining < reminder_threshold_hours[1] * 3600:  # 紧急提醒
+                        email_reminders["urgent"].append((course_name, homework_info))
+                    elif time_remaining < reminder_threshold_hours[0] * 3600:  # 普通提醒
+                        email_reminders["normal"].append((course_name, homework_info))
+                    else:  # 超出阈值作业
+                        email_reminders["out_of_threshold"].append((course_name, homework_info))
+                else:
+                    print(f"{course_name} 作业已超过提交时间，未添加提醒")
 
     # 获取上次的提醒内容
     last_reminders = load_last_reminders(student_id, csv_file_path)
@@ -66,14 +69,15 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
         # 保存新提醒内容到 CSV 文件
         save_reminders_to_csv(email_reminders, csv_file_path, student_id)
 
-        # 判断是否发送提醒
-        if current_time > last_notified_time:
-            send_summary_email(email_reminders, to_email)
-            print("紧急程度或普通提醒有变化，需要提醒")
-            return email_reminders  # 返回提醒内容
+        send_summary_email(email_reminders, to_email)
+        print("紧急程度或普通提醒有变化，需要提醒")
+        return email_reminders  # 返回提醒内容
     else:
+        #没变化也要保存
+        save_reminders_to_csv(email_reminders, csv_file_path, student_id)
         print("提醒内容没有变化")
         return None  # 无需提醒
+
 
 
 def compare_reminders(current_reminders, last_reminders):
@@ -83,7 +87,7 @@ def compare_reminders(current_reminders, last_reminders):
     :param last_reminders: 上次保存的提醒内容
     :return: 布尔值，表示是否相同
     """
-    for reminder_type in ["urgent", "normal"]:
+    for reminder_type in ["urgent", "normal"]: # 忽略掉阈值外的作业
         current_set = {
             (course_name, info.get("作业标题") or info.get("作业名称"), info.get("结束时间"), info.get("提交状态"))
             for course_name, info in current_reminders[reminder_type]
@@ -115,7 +119,7 @@ def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
         writer.writeheader()
 
         # 将 urgent 和 normal 列表的数据写入 CSV
-        for reminder_type in ["urgent", "normal"]:
+        for reminder_type in ["urgent", "normal","out_of_threshold"]:
             for course_name, homework_info in email_reminders[reminder_type]:
                 reminder_data = {
                     "课程名称": course_name,
@@ -135,7 +139,7 @@ def load_last_reminders(student_id, csv_file_path):
     :param csv_file_path: CSV 文件的保存路径
     :return: 上次提醒的内容，格式为 {"normal": [], "urgent": []}
     """
-    reminders = {"normal": [], "urgent": []}
+    reminders = {"normal": [], "urgent": [],"out_of_threshold":[]}
     try:
         with open(f"{student_id}_{csv_file_path}", mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
@@ -206,6 +210,15 @@ def send_summary_email(email_reminders, to_email):
           border-radius: 5px;
           color: red;
         }}
+        .out_of_threshold-course {{
+        margin-bottom: 15px;
+        padding: 10px;
+        border-left: 4px solid #b0b0b0; /* 灰色的左边框 */
+        background-color: #f2f2f2;      /* 浅灰色背景 */
+        border-radius: 5px;
+        color: #808080;                 /* 灰色字体 */
+        }}
+
         .footer {{
           text-align: center;
           font-size: 0.9em;
@@ -264,6 +277,17 @@ def send_summary_email(email_reminders, to_email):
         for course_name, homework_info in email_reminders["normal"]:
             body += f"""
               <div class="course">
+                <strong>课程：</strong> {course_name}<br>
+                <strong>作业标题：</strong> {homework_info['作业标题']}<br>
+                <strong>截止时间：</strong> {homework_info['结束时间']}<br>
+              </div>
+            """
+    # 普通提醒内容
+    if email_reminders["out_of_threshold"]:
+        body += "<h3>还早的很的作业：</h3>"
+        for course_name, homework_info in email_reminders["out_of_threshold"]:
+            body += f"""
+              <div class="out_of_threshold-course">
                 <strong>课程：</strong> {course_name}<br>
                 <strong>作业标题：</strong> {homework_info['作业标题']}<br>
                 <strong>截止时间：</strong> {homework_info['结束时间']}<br>
