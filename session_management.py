@@ -1,16 +1,31 @@
-# session_management.py
-
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from utils import md5
+
+def initialize_retry_session(retries=3, backoff_factor=0.3, status_forcelist=(500, 502, 503, 504)):
+    """初始化带重试机制的会话。"""
+    session = requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 def initialize_session(base_url):
     """初始化会话并获取初始的cookie和JSESSIONID。"""
-    session = requests.Session()
+    session = initialize_retry_session()
     captcha_url_png = f"{base_url}/GetImg"
 
     # 获取初始cookie
-    session.get(captcha_url_png)
     response = session.get(base_url)
+    session.get(captcha_url_png)
     if response.status_code == 200:
         print("已获取初始cookie。")
         jsessionid = session.cookies.get('JSESSIONID')
