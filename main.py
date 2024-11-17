@@ -39,7 +39,7 @@ def save_users_to_csv(file_path, users):
                 "email": user["email"],
                 "last_notified": user["last_notified"].strftime("%Y-%m-%d %H:%M:%S") if user["last_notified"] else "",
                 "reminder_threshold_1": user["reminder_thresholds"][0],
-                "reminder_threshold_`2": user["reminder_thresholds"][1]
+                "reminder_threshold_2": user["reminder_thresholds"][1]
             })
 
 
@@ -54,28 +54,33 @@ def login_and_fetch_data(base_url, student_id):
     return session, user_info, course_list
 
 
-def check_and_send_reminders():
+async def fetch_and_process_user(user, csv_file_path):
+    """处理单个用户的数据抓取和提醒逻辑"""
+    student_id = user["student_id"]
+    to_email = user["email"]
+    reminder_thresholds = user["reminder_thresholds"]
+    last_notified = user["last_notified"]
+
+    # 执行数据抓取和提醒逻辑
+    session, user_info, course_list = login_and_fetch_data(BASE_URL, student_id)
+    homework_data_json = await fetch_homework_data(
+        session,
+        BASE_URL,
+        course_list,
+        user_info,
+    )
+    select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified,
+                           csv_file_path, student_id)
+    return student_id, reminder_thresholds
+
+
+async def check_and_send_reminders():
     """检查并根据提醒阈值发送提醒邮件。"""
     users = load_users_from_csv(CSV_FILE_PATH)
     current_time = datetime.now()
 
     for user in users:
-        student_id = user["student_id"]
-        to_email = user["email"]
-        reminder_thresholds = user["reminder_thresholds"]
-        last_notified = user["last_notified"]
-
-        # 执行数据抓取和提醒逻辑
-        session, user_info, course_list = login_and_fetch_data(BASE_URL, student_id)
-        homework_data_json = asyncio.run(fetch_homework_data(
-            session,
-            BASE_URL,
-            course_list,
-            user_info,
-        ))
-        select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified,
-                               csv_file_path, student_id)
-
+        student_id, reminder_thresholds = await fetch_and_process_user(user, CSV_FILE_PATH)
         # 更新提醒时间为当前时间
         user["last_notified"] = current_time
         print(f"Processed homework data for student {student_id} with threshold {reminder_thresholds}")
@@ -84,17 +89,18 @@ def check_and_send_reminders():
     save_users_to_csv(CSV_FILE_PATH, users)
 
 
-# 启动时立即执行一次检查
-asyncio.run(check_and_send_reminders())
-
 # 创建一个包装函数来运行异步函数
 def run_async_check():
     asyncio.run(check_and_send_reminders())
 
-# 使用包装函数来设置定时任务
-schedule.every(15).minutes.do(run_async_check)
 
 if __name__ == "__main__":
+    # 启动时立即执行一次检查
+    run_async_check()
+
+    # 设置定时任务
+    schedule.every(15).minutes.do(run_async_check)
+
     print("定时任务启动，启动时立即检查一次，之后每隔15分钟检查一次...")
     while True:
         schedule.run_pending()
