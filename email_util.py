@@ -129,7 +129,7 @@ def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
             # 按结束时间排序
             sorted_reminders = sorted(
                 email_reminders.get(reminder_type, []),
-                key=lambda x: datetime.strptime(x[1]["结束时间"], "%Y-%m-%d %H:%M:%S")
+                key=lambda x: datetime.strptime(x[1]["结束时间"], "%Y-%m-%d %H:%M")
             )
             # 写入每条记录
             for course_name, homework_info in sorted_reminders:
