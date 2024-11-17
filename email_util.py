@@ -4,6 +4,7 @@ import smtplib
 from datetime import datetime, timedelta
 from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAGE
 import base64
+
 import json
 import csv
 
@@ -51,6 +52,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
             if homework_info["提交状态"] == "未提交" and end_time:
                 time_remaining = (end_time - current_time).total_seconds()  # 剩余时间，单位为秒
                 # 根据时间阈值分类提醒类型
+                title=homework_info["作业标题"]
                 if time_remaining >= 0:  # 确保剩余时间为非负数
                     if time_remaining < reminder_threshold_hours[1] * 3600:  # 紧急提醒
                         email_reminders["urgent"].append((course_name, homework_info))
@@ -59,7 +61,8 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
                     else:  # 超出阈值作业
                         email_reminders["out_of_threshold"].append((course_name, homework_info))
                 else:
-                    print(f"{course_name} 作业已超过提交时间，未添加提醒")
+                    email_reminders["late"].append((course_name, homework_info))
+                    print(f"{course_name}:{title} 作业已超过提交时间，未添加提醒")
 
     # 获取上次的提醒内容
     last_reminders = load_last_reminders(student_id, csv_file_path)
@@ -87,7 +90,7 @@ def compare_reminders(current_reminders, last_reminders):
     :param last_reminders: 上次保存的提醒内容
     :return: 布尔值，表示是否相同
     """
-    for reminder_type in ["urgent", "normal"]: # 忽略掉阈值外的作业
+    for reminder_type in ["urgent", "normal"]: # 忽略掉阈值外和未提交的作业
         current_set = {
             (course_name, info.get("作业标题") or info.get("作业名称"), info.get("结束时间"), info.get("提交状态"))
             for course_name, info in current_reminders[reminder_type]
@@ -101,11 +104,13 @@ def compare_reminders(current_reminders, last_reminders):
             return False
     return True
 
+
 def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
     """
-    将提醒内容保存到 CSV 文件中。
+    将提醒内容按类型排序（urgent > normal > out_of_threshold > late），
+    并在类型内按结束时间递增排序后保存到 CSV 文件中。
 
-    :param email_reminders: 包含 "urgent" 和 "normal" 作业的字典
+    :param email_reminders: 包含 "urgent"、"normal"、"out_of_threshold" 和 "late" 作业的字典
     :param csv_file_path: CSV 文件的保存路径
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
@@ -118,9 +123,16 @@ def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
         # 写入表头
         writer.writeheader()
 
-        # 将 urgent 和 normal 列表的数据写入 CSV
-        for reminder_type in ["urgent", "normal","out_of_threshold"]:
-            for course_name, homework_info in email_reminders[reminder_type]:
+        # 按类型的顺序写入数据
+        type_order = ["urgent", "normal", "out_of_threshold", "late"]
+        for reminder_type in type_order:
+            # 按结束时间排序
+            sorted_reminders = sorted(
+                email_reminders.get(reminder_type, []),
+                key=lambda x: datetime.strptime(x[1]["结束时间"], "%Y-%m-%d %H:%M:%S")
+            )
+            # 写入每条记录
+            for course_name, homework_info in sorted_reminders:
                 reminder_data = {
                     "课程名称": course_name,
                     "作业标题": homework_info.get("作业标题", ""),
@@ -129,7 +141,6 @@ def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
                     "提醒类型": reminder_type
                 }
                 writer.writerow(reminder_data)
-
 
 def load_last_reminders(student_id, csv_file_path):
     """
@@ -273,7 +284,7 @@ def send_summary_email(email_reminders, to_email):
 
     # 普通提醒内容
     if email_reminders["normal"]:
-        body += "<h3>普通提醒：</h3>"
+        body += "<h3style='color: #f9f9f9;'>普通提醒：</h3>"
         for course_name, homework_info in email_reminders["normal"]:
             body += f"""
               <div class="course">
@@ -284,7 +295,7 @@ def send_summary_email(email_reminders, to_email):
             """
     # 普通提醒内容
     if email_reminders["out_of_threshold"]:
-        body += "<h3>还早的很的作业：</h3>"
+        body += "<h3 style='color: #808080;'>还早的很的作业：</h3>"
         for course_name, homework_info in email_reminders["out_of_threshold"]:
             body += f"""
               <div class="out_of_threshold-course">

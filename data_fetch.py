@@ -82,6 +82,7 @@ def fetch_homework_data(session, base_url, course_list, user_info, max_retries=3
                 retries += 1
                 if retries < max_retries:
                     print(f"请求失败，第 {retries} 次重试，课程：{course_name} 错误: {e}")
+                    print(f"response全部内容：{session.get(url)}")
                     time.sleep(backoff_factor * retries)  # 等待后重试
                 else:
                     print(f"请求失败，已达到最大重试次数 ({max_retries})，课程：{course_name}，错误: {e}")
