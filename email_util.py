@@ -270,10 +270,18 @@ def send_summary_email(email_reminders, to_email):
           <p>尼尼有下列课程的作业即将到期：</p>
     """
 
+    # 按类型的顺序写入数据
+    type_order = ["urgent", "normal", "out_of_threshold", "late"]
+    for reminder_type in type_order:
+        # 按结束时间排序
+        sorted_reminders = sorted(
+            email_reminders.get(reminder_type, []),
+            key=lambda x: datetime.strptime(x[1]["结束时间"], "%Y-%m-%d %H:%M")
+        )
     # 紧急提醒内容
     if email_reminders["urgent"]:
         body += "<h3 style='color: red;'>紧急提醒：</h3>"
-        for course_name, homework_info in email_reminders["urgent"]:
+        for course_name, homework_info in sorted_reminders["urgent"]:
             body += f"""
               <div class="urgent-course">
                 <strong>课程：</strong> {course_name}<br>
@@ -285,7 +293,7 @@ def send_summary_email(email_reminders, to_email):
     # 普通提醒内容
     if email_reminders["normal"]:
         body += "<h3style='color: #f9f9f9;'>普通提醒：</h3>"
-        for course_name, homework_info in email_reminders["normal"]:
+        for course_name, homework_info in sorted_reminders["normal"]:
             body += f"""
               <div class="course">
                 <strong>课程：</strong> {course_name}<br>
@@ -296,7 +304,7 @@ def send_summary_email(email_reminders, to_email):
     # 普通提醒内容
     if email_reminders["out_of_threshold"]:
         body += "<h3 style='color: #808080;'>还早的很的作业：</h3>"
-        for course_name, homework_info in email_reminders["out_of_threshold"]:
+        for course_name, homework_info in sorted_reminders["out_of_threshold"]:
             body += f"""
               <div class="out_of_threshold-course">
                 <strong>课程：</strong> {course_name}<br>
