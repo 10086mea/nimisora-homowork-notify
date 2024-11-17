@@ -269,19 +269,20 @@ def send_summary_email(email_reminders, to_email):
           <p>欧哈呦！</p>
           <p>尼尼有下列课程的作业即将到期：</p>
     """
-
-    # 按类型的顺序写入数据
+    # 创建一个新的字典来存储排序后的数据
+    sorted_reminders_dict = {}
     type_order = ["urgent", "normal", "out_of_threshold", "late"]
+    # 对每种类型的提醒进行排序
     for reminder_type in type_order:
-        # 按结束时间排序
-        sorted_reminders = sorted(
+        sorted_reminders_dict[reminder_type] = sorted(
             email_reminders.get(reminder_type, []),
             key=lambda x: datetime.strptime(x[1]["结束时间"], "%Y-%m-%d %H:%M")
         )
+
     # 紧急提醒内容
     if email_reminders["urgent"]:
         body += "<h3 style='color: red;'>紧急提醒：</h3>"
-        for course_name, homework_info in sorted_reminders["urgent"]:
+        for course_name, homework_info in sorted_reminders_dict["urgent"]:
             body += f"""
               <div class="urgent-course">
                 <strong>课程：</strong> {course_name}<br>
@@ -292,8 +293,8 @@ def send_summary_email(email_reminders, to_email):
 
     # 普通提醒内容
     if email_reminders["normal"]:
-        body += "<h3style='color: #f9f9f9;'>普通提醒：</h3>"
-        for course_name, homework_info in sorted_reminders["normal"]:
+        body += "<h3 style='color: #4a90e2;'>普通提醒：</h3>"  # 修正了颜色
+        for course_name, homework_info in sorted_reminders_dict["normal"]:
             body += f"""
               <div class="course">
                 <strong>课程：</strong> {course_name}<br>
@@ -301,18 +302,18 @@ def send_summary_email(email_reminders, to_email):
                 <strong>截止时间：</strong> {homework_info['结束时间']}<br>
               </div>
             """
-    # 普通提醒内容
+
+    # 灰色提醒内容
     if email_reminders["out_of_threshold"]:
         body += "<h3 style='color: #808080;'>还早的很的作业：</h3>"
-        for course_name, homework_info in sorted_reminders["out_of_threshold"]:
+        for course_name, homework_info in sorted_reminders_dict["out_of_threshold"]:
             body += f"""
               <div class="out_of_threshold-course">
                 <strong>课程：</strong> {course_name}<br>
                 <strong>作业标题：</strong> {homework_info['作业标题']}<br>
                 <strong>截止时间：</strong> {homework_info['结束时间']}<br>
               </div>
-            """
-
+              """
     body += f"""
         
           <p>不要忘了交作业哦~</p>

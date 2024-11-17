@@ -80,7 +80,7 @@ async def check_and_send_reminders():
     current_time = datetime.now()
 
     for user in users:
-        student_id, reminder_thresholds = await fetch_and_process_user(user, CSV_FILE_PATH)
+        student_id, reminder_thresholds = await fetch_and_process_user(user, csv_file_path)
         # 更新提醒时间为当前时间
         user["last_notified"] = current_time
         print(f"Processed homework data for student {student_id} with threshold {reminder_thresholds}")
