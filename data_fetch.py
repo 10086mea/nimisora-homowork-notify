@@ -1,7 +1,11 @@
 # data_fetch.py
-
+import aiohttp
+import asyncio
+import time
+import requests
 import json
-
+from requests.exceptions import RequestException, JSONDecodeError
+from typing import Dict, List, Any
 
 def fetch_semester_info(session, base_url, jsessionid):
     """获取学期信息"""
@@ -59,93 +63,121 @@ def fetch_course_list(session, base_url, jsessionid, xq_code):
         return courses
     else:
         raise Exception("获取课程列表失败。")
-import time
-import requests
-import json
-from requests.exceptions import RequestException, JSONDecodeError
 
-def fetch_homework_data(session, base_url, course_list, user_info, max_retries=3, backoff_factor=1):
-    """获取所有课程的作业数据，带重试机制"""
+
+async def create_async_session(sync_session: requests.Session) -> aiohttp.ClientSession:
+    """从同步session创建异步session"""
+    cookies = {k: v for k, v in sync_session.cookies.items()}
+    headers = dict(sync_session.headers)
+
+    return aiohttp.ClientSession(
+        cookies=cookies,
+        headers=headers,
+        timeout=aiohttp.ClientTimeout(total=300)
+    )
+
+
+async def fetch_homework_data_for_course(
+        course_name: str,
+        url: str,
+        session: aiohttp.ClientSession,
+        retries: int = 0,
+        max_retries: int = 3,
+        backoff_factor: int = 1,
+        subType: int=0
+) -> List[Dict[str, Any]]:
+    """发送异步请求并获取作业数据，带重试机制"""
+    try:
+        async with session.get(url) as response:
+            if response.status != 200:
+                raise Exception(f"HTTP状态码: {response.status}")
+
+            # 读取响应内容
+            content = await response.text()
+            homework_data = json.loads(content)
+
+            # 提取所需的作业信息
+            formatted_homeworks = []
+            for homework in homework_data.get("courseNoteList", []):
+                homework_info = {
+                    "作业标题": homework.get("title"),
+                    "创建日期": homework.get("create_date"),
+                    "开放时间": homework.get("open_date"),
+                    "结束时间": homework.get("end_time"),
+                    "提交状态": homework.get("subStatus"),
+                    "分数": homework.get("stu_score")
+                }
+                formatted_homeworks.append(homework_info)
+            homework_types = {
+                0: "普通作业",
+                1: "课程报告",
+                2: "实验作业"
+            }
+            print(f"[{course_name}] {homework_types[subType]}获取完成")
+            return formatted_homeworks
+
+    except (aiohttp.ClientError, JSONDecodeError, Exception) as e:
+        retries += 1
+        if retries < max_retries:
+            print(f"请求失败，第 {retries} 次重试，课程：{course_name} 错误: {e}")
+            await asyncio.sleep(backoff_factor * retries)  # 等待后重试
+            return await fetch_homework_data_for_course(
+                course_name, url, session, retries, max_retries, backoff_factor
+            )
+        else:
+            print(f"请求失败，已达到最大重试次数 ({max_retries})，课程：{course_name}，错误: {e}")
+            return []
+
+
+async def fetch_homework_data(
+        sync_session: requests.Session,
+        base_url: str,
+        course_list: List[Dict[str, Any]],
+        user_info: Dict[str, Any]
+) -> str:
+    """获取所有课程的作业数据"""
     all_courses_homework_data = {}
 
-    def fetch_homework_data_for_course(course_name, url, retries):
-        """发送请求并获取作业数据，带重试机制"""
-        while retries < max_retries:
-            try:
-                response = session.get(url)
-                response.raise_for_status()  # 如果响应码不是200，抛出异常
+    # 创建异步session
+    async with await create_async_session(sync_session) as async_session:
+        # 使用异步任务并发处理
+        tasks = []
+        for course in course_list:
+            course_name = course['name']
+            course_id = course['id']
 
-                # 尝试解析 JSON
-                homework_data = response.json()
-                return homework_data.get("courseNoteList", [])
-            except (RequestException, JSONDecodeError) as e:
-                retries += 1
-                if retries < max_retries:
-                    print(f"请求失败，第 {retries} 次重试，课程：{course_name} 错误: {e}")
-                    print(f"response全部内容：{session.get(url)}")
-                    time.sleep(backoff_factor * retries)  # 等待后重试
-                else:
-                    print(f"请求失败，已达到最大重试次数 ({max_retries})，课程：{course_name}，错误: {e}")
-                    return []  # 如果达到最大重试次数，返回空列表
+            # 定义不同类型作业的URL subType 0:作业 1:课程报告 2:实验
+            homework_types = [
+                (subType,f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course_id}&subType={subType}&page=1&pagesize=100")
+                for subType in range(3)
+            ]
 
-    # 遍历所有课程
-    for course in course_list:
-        course_name = course['name']
+            # 为每个课程和作业类型创建异步任务
+            course_tasks = [
+                fetch_homework_data_for_course(course_name, url, async_session,subType=subType)
+                for subType, url in homework_types
+            ]
+            tasks.extend(course_tasks)
 
-        # 定义不同类型作业的URL
-        homework_url_0 = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=0&page=1&pagesize=100"
-        homework_url_1 = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=1&page=1&pagesize=100"
-        homework_url_2 = f"{base_url}/back/coursePlatform/homeWork.shtml?method=getHomeWorkList&cId={course['id']}&subType=2&page=1&pagesize=100"
+        # 批量运行异步任务
+        all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 获取不同类型的作业数据
-        course_homeworks = []
+        # 处理结果
+        for i, course in enumerate(course_list):
+            course_name = course['name']
+            # 获取当前课程的3个任务结果
+            course_results = all_results[i * 3:(i + 1) * 3]
 
-        # 获取作业类型 0（普通作业）
-        homeworks_0 = fetch_homework_data_for_course(course_name, homework_url_0, retries=0)
-        for homework in homeworks_0:
-            homework_info = {
-                "作业标题": homework.get("title"),
-                "创建日期": homework.get("create_date"),
-                "开放时间": homework.get("open_date"),
-                "结束时间": homework.get("end_time"),
-                "提交状态": homework.get("subStatus"),
-                "分数": homework.get("stu_score")
-            }
-            course_homeworks.append(homework_info)
+            # 合并当前课程的所有作业数据
+            valid_results = []
+            for result in course_results:
+                if isinstance(result, list):  # 确保结果不是异常
+                    valid_results.extend(result)
 
-        # 获取作业类型 1（课程报告）
-        homeworks_1 = fetch_homework_data_for_course(course_name, homework_url_1, retries=0)
-        for homework in homeworks_1:
-            homework_info = {
-                "作业标题": homework.get("title"),
-                "创建日期": homework.get("create_date"),
-                "开放时间": homework.get("open_date"),
-                "结束时间": homework.get("end_time"),
-                "提交状态": homework.get("subStatus"),
-                "分数": homework.get("stu_score")
-            }
-            course_homeworks.append(homework_info)
+            if valid_results:
+                all_courses_homework_data[course_name] = valid_results
+            else:
+                print(f"课程 {course_name} 无作业数据")
 
-        # 获取作业类型 2（实验）
-        homeworks_2 = fetch_homework_data_for_course(course_name, homework_url_2, retries=0)
-        for homework in homeworks_2:
-            homework_info = {
-                "作业标题": homework.get("title"),
-                "创建日期": homework.get("create_date"),
-                "开放时间": homework.get("open_date"),
-                "结束时间": homework.get("end_time"),
-                "提交状态": homework.get("subStatus"),
-                "分数": homework.get("stu_score")
-            }
-            course_homeworks.append(homework_info)
-
-        # 将课程的作业数据添加到总数据字典中
-        if course_homeworks:
-            all_courses_homework_data[course_name] = course_homeworks
-        else:
-            print(f"课程 {course_name} 无作业数据")
-
-    # 转换为 JSON 格式
-    all_courses_homework_json = json.dumps(all_courses_homework_data, ensure_ascii=False, indent=4)
-    return all_courses_homework_json
-
+    # 转换为JSON格式
+    return json.dumps(all_courses_homework_data, ensure_ascii=False, indent=4)

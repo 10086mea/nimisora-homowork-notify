@@ -6,6 +6,7 @@ from datetime import datetime
 from session_management import initialize_session, get_captcha, perform_login
 from data_fetch import fetch_semester_info, fetch_user_info, fetch_course_list, fetch_homework_data
 from email_util import select_remind_homework
+import asyncio
 
 CSV_FILE_PATH = 'user_data.csv'  # CSV文件路径
 csv_file_path = 'class_log.csv'
@@ -38,7 +39,7 @@ def save_users_to_csv(file_path, users):
                 "email": user["email"],
                 "last_notified": user["last_notified"].strftime("%Y-%m-%d %H:%M:%S") if user["last_notified"] else "",
                 "reminder_threshold_1": user["reminder_thresholds"][0],
-                "reminder_threshold_2": user["reminder_thresholds"][1]
+                "reminder_threshold_`2": user["reminder_thresholds"][1]
             })
 
 
@@ -66,13 +67,14 @@ def check_and_send_reminders():
 
         # 执行数据抓取和提醒逻辑
         session, user_info, course_list = login_and_fetch_data(BASE_URL, student_id)
-        homework_data_json = fetch_homework_data(
+        homework_data_json = asyncio.run(fetch_homework_data(
             session,
             BASE_URL,
             course_list,
             user_info,
-        )
-        select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified,csv_file_path,student_id)
+        ))
+        select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified,
+                               csv_file_path, student_id)
 
         # 更新提醒时间为当前时间
         user["last_notified"] = current_time
@@ -83,10 +85,14 @@ def check_and_send_reminders():
 
 
 # 启动时立即执行一次检查
-check_and_send_reminders()
+asyncio.run(check_and_send_reminders())
 
-# 设置定时任务每隔15分钟执行一次
-schedule.every(15).minutes.do(check_and_send_reminders)
+# 创建一个包装函数来运行异步函数
+def run_async_check():
+    asyncio.run(check_and_send_reminders())
+
+# 使用包装函数来设置定时任务
+schedule.every(15).minutes.do(run_async_check)
 
 if __name__ == "__main__":
     print("定时任务启动，启动时立即检查一次，之后每隔15分钟检查一次...")

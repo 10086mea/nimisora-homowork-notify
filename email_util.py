@@ -21,7 +21,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
     current_time = datetime.now()
-    email_reminders = {"normal": [], "urgent": [], "out_of_threshold": []}  # 新增 "out_of_threshold" 类别
+    email_reminders = {"normal": [], "urgent": [], "out_of_threshold": [],"late":[]}  # 新增 "out_of_threshold","late"类别
 
     # 将字符串形式的上次通知时间转换为 datetime 对象
     last_notified_time = last_notified
@@ -150,7 +150,7 @@ def load_last_reminders(student_id, csv_file_path):
     :param csv_file_path: CSV 文件的保存路径
     :return: 上次提醒的内容，格式为 {"normal": [], "urgent": []}
     """
-    reminders = {"normal": [], "urgent": [],"out_of_threshold":[]}
+    reminders = {"normal": [], "urgent": [],"out_of_threshold":[],"late":[]}
     try:
         with open(f"{student_id}_{csv_file_path}", mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
