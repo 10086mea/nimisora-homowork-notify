@@ -114,6 +114,8 @@ async def fetch_homework_data_for_course(
                 2: "实验作业"
             }
             print(f"[{course_name}] {homework_types[subType]}获取完成")
+            if(formatted_homeworks):
+                print(f"获取到{formatted_homeworks}")
             return formatted_homeworks
 
     except (aiohttp.ClientError, JSONDecodeError, Exception) as e:

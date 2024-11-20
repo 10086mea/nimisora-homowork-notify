@@ -28,7 +28,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
 
     # 将JSON格式的作业数据解析为Python对象
     all_courses_homework_data = json.loads(homework_data_json)
-
+    send_flag=0
     # 遍历所有课程的作业
     for course_name, homeworks in all_courses_homework_data.items():
         for homework_info in homeworks:
@@ -56,8 +56,10 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
                 if time_remaining >= 0:  # 确保剩余时间为非负数
                     if time_remaining < reminder_threshold_hours[1] * 3600:  # 紧急提醒
                         email_reminders["urgent"].append((course_name, homework_info))
+                        send_flag = 1
                     elif time_remaining < reminder_threshold_hours[0] * 3600:  # 普通提醒
                         email_reminders["normal"].append((course_name, homework_info))
+                        send_flag = 1
                     else:  # 超出阈值作业
                         email_reminders["out_of_threshold"].append((course_name, homework_info))
                 else:
@@ -71,8 +73,8 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
     if not compare_reminders(email_reminders, last_reminders):
         # 保存新提醒内容到 CSV 文件
         save_reminders_to_csv(email_reminders, csv_file_path, student_id)
-
-        send_summary_email(email_reminders, to_email)
+        if(send_flag):
+            send_summary_email(email_reminders, to_email)
         print("紧急程度或普通提醒有变化，需要提醒")
         return email_reminders  # 返回提醒内容
     else:
