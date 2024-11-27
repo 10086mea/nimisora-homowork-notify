@@ -7,9 +7,8 @@ from session_management import initialize_session, get_captcha, perform_login
 from data_fetch import fetch_semester_info, fetch_user_info, fetch_course_list, fetch_homework_data
 from email_util import select_remind_homework
 import asyncio
+from config import CSV_FILE_PATH,log_file_path
 
-CSV_FILE_PATH = 'user_data.csv'  # CSV文件路径
-csv_file_path = 'class_log.csv'
 
 def load_users_from_csv(file_path):
     """从CSV文件加载用户信息，读取学号、邮箱、上次提醒时间和提醒阈值。"""
@@ -54,7 +53,7 @@ def login_and_fetch_data(base_url, student_id):
     return session, user_info, course_list
 
 
-async def fetch_and_process_user(user, csv_file_path):
+async def fetch_and_process_user(user, log_file_path):
     """处理单个用户的数据抓取和提醒逻辑"""
     student_id = user["student_id"]
     to_email = user["email"]
@@ -70,7 +69,7 @@ async def fetch_and_process_user(user, csv_file_path):
         user_info,
     )
     select_remind_homework(homework_data_json, to_email, reminder_thresholds, last_notified,
-                           csv_file_path, student_id)
+                           log_file_path, student_id)
     return student_id, reminder_thresholds
 
 
@@ -80,7 +79,7 @@ async def check_and_send_reminders():
     current_time = datetime.now()
 
     for user in users:
-        student_id, reminder_thresholds = await fetch_and_process_user(user, csv_file_path)
+        student_id, reminder_thresholds = await fetch_and_process_user(user, log_file_path)
         # 更新提醒时间为当前时间
         user["last_notified"] = current_time
         print(f"Processed homework data for student {student_id} with threshold {reminder_thresholds}")

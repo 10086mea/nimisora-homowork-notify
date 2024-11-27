@@ -8,7 +8,7 @@ import base64
 import json
 import csv
 
-def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified, csv_file_path,
+def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified, log_file_path,
                            student_id):
     """
     检查作业数据并根据提醒阈值条件筛选出需要提醒的作业项，并保存到CSV文件。
@@ -17,7 +17,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
     :param to_email: 用户邮箱，用于发送提醒
     :param reminder_threshold_hours: 提前多少小时提醒的阈值列表（第一个值为普通提醒阈值，第二个值为紧急提醒阈值）
     :param last_notified: 上次通知时间，格式为 "%Y-%m-%d %H:%M:%S"
-    :param csv_file_path: 用于保存提醒内容的CSV文件路径
+    :param log_file_path: 用于保存提醒内容的CSV文件路径
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
     current_time = datetime.now()
@@ -67,19 +67,19 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
                     print(f"{course_name}:{title} 作业已超过提交时间，未添加提醒")
 
     # 获取上次的提醒内容
-    last_reminders = load_last_reminders(student_id, csv_file_path)
+    last_reminders = load_last_reminders(student_id, log_file_path)
 
     # 判断当前提醒内容与上次是否相同
     if not compare_reminders(email_reminders, last_reminders):
         # 保存新提醒内容到 CSV 文件
-        save_reminders_to_csv(email_reminders, csv_file_path, student_id)
+        save_reminders_to_csv(email_reminders, log_file_path, student_id)
         if(send_flag):
             send_summary_email(email_reminders, to_email)
         print("紧急程度或普通提醒有变化，需要提醒")
         return email_reminders  # 返回提醒内容
     else:
         #没变化也要保存
-        save_reminders_to_csv(email_reminders, csv_file_path, student_id)
+        save_reminders_to_csv(email_reminders, log_file_path, student_id)
         print("提醒内容没有变化")
         return None  # 无需提醒
 
@@ -107,19 +107,19 @@ def compare_reminders(current_reminders, last_reminders):
     return True
 
 
-def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
+def save_reminders_to_csv(email_reminders, log_file_path, student_id):
     """
     将提醒内容按类型排序（urgent > normal > out_of_threshold > late），
     并在类型内按结束时间递增排序后保存到 CSV 文件中。
 
     :param email_reminders: 包含 "urgent"、"normal"、"out_of_threshold" 和 "late" 作业的字典
-    :param csv_file_path: CSV 文件的保存路径
+    :param log_file_path: CSV 文件的保存路径
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
     fieldnames = ["课程名称", "作业标题", "结束时间", "提交状态", "提醒类型"]
 
     # 打开 CSV 文件并写入数据
-    with open(f"{student_id}_{csv_file_path}", mode='w', newline='', encoding='utf-8') as file:
+    with open(f"{student_id}_{log_file_path}", mode='w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
 
         # 写入表头
@@ -144,17 +144,17 @@ def save_reminders_to_csv(email_reminders, csv_file_path, student_id):
                 }
                 writer.writerow(reminder_data)
 
-def load_last_reminders(student_id, csv_file_path):
+def load_last_reminders(student_id, log_file_path):
     """
     从 CSV 文件加载上次的提醒内容。
 
     :param student_id: 学生学号，用于根据学号加载对应的CSV文件
-    :param csv_file_path: CSV 文件的保存路径
+    :param log_file_path: CSV 文件的保存路径
     :return: 上次提醒的内容，格式为 {"normal": [], "urgent": []}
     """
     reminders = {"normal": [], "urgent": [],"out_of_threshold":[],"late":[]}
     try:
-        with open(f"{student_id}_{csv_file_path}", mode='r', encoding='utf-8') as file:
+        with open(f"{student_id}_{log_file_path}", mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
                 reminder_type = row["提醒类型"]
