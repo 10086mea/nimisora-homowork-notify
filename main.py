@@ -8,7 +8,8 @@ from data_fetch import fetch_semester_info, fetch_user_info, fetch_course_list, 
 from email_util import select_remind_homework
 import asyncio
 from config import CSV_FILE_PATH,log_file_path
-
+import traceback
+from termcolor import colored
 
 def load_users_from_csv(file_path):
     """从CSV文件加载用户信息，读取学号、邮箱、上次提醒时间和提醒阈值。"""
@@ -79,11 +80,18 @@ async def check_and_send_reminders():
     current_time = datetime.now()
 
     for user in users:
-        student_id, reminder_thresholds = await fetch_and_process_user(user, log_file_path)
-        # 更新提醒时间为当前时间
-        user["last_notified"] = current_time
-        print(f"Processed homework data for student {student_id} with threshold {reminder_thresholds}")
-
+        try:
+            student_id, reminder_thresholds = await fetch_and_process_user(user, log_file_path)
+            user["last_notified"] = current_time
+            print(f"Processed homework data for student {student_id} with threshold {reminder_thresholds}")
+        except Exception as e:
+            error_trace = traceback.format_exc()
+            with open('error.log', 'a') as f:
+                f.write(f"{current_time}: Error processing user {user.get('student_id', 'unknown')}:\n{error_trace}\n")
+            print(colored(f"Error processing user {user.get('student_id', 'unknown')}:", 'red', attrs=['bold']))
+            print(colored(f"Error: {str(e)}", 'red'))
+            print(colored(f"Location:\n{error_trace}", 'yellow'))
+            continue
     # 保存更新后的用户信息到CSV
     save_users_to_csv(CSV_FILE_PATH, users)
 
