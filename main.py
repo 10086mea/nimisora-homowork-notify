@@ -87,20 +87,25 @@ async def check_and_send_reminders():
     # 保存更新后的用户信息到CSV
     save_users_to_csv(CSV_FILE_PATH, users)
 
-
-# 创建一个包装函数来运行异步函数
 def run_async_check():
-    asyncio.run(check_and_send_reminders())
-
+    try:
+        asyncio.run(check_and_send_reminders())
+    except Exception as e:
+        print(f"运行异步函数时发生错误: {e}")
 
 if __name__ == "__main__":
-    # 启动时立即执行一次检查
-    run_async_check()
-
-    # 设置定时任务
-    schedule.every(15).minutes.do(run_async_check)
-
-    print("定时任务启动，启动时立即检查一次，之后每隔15分钟检查一次...")
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        try:
+            # 启动时立即执行一次检查
+            run_async_check()
+
+            # 设置定时任务
+            schedule.every(15).minutes.do(run_async_check)
+
+            print("定时任务启动，启动时立即检查一次，之后每隔15分钟检查一次...")
+            while True:
+                schedule.run_pending()
+                time.sleep(1)
+        except Exception as e:
+            print(f"主循环发生错误: {e}")
+            time.sleep(5)  # 发生错误后等待5秒再重试
