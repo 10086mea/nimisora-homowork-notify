@@ -2,11 +2,20 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
 from datetime import datetime, timedelta
-from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAGE
+from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAGE,MAIL_FROM_ADDRESS
 import base64
 
 import json
 import csv
+
+def normalize_end_time(end_time_str):#处理傻逼 24:00特殊时间
+    if end_time_str and '24:00' in end_time_str:
+        # 将24:00转换为下一天的00:00
+        date = end_time_str.split()[0]
+        temp_time = datetime.strptime(f"{date} 00:00", "%Y-%m-%d %H:%M")
+        next_day = temp_time + timedelta(days=1)
+        return next_day.strftime("%Y-%m-%d %H:%M:%S")
+    return end_time_str
 
 def select_remind_homework(homework_data_json, to_email, reminder_threshold_hours, last_notified, log_file_path,
                            student_id):
@@ -34,6 +43,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
         for homework_info in homeworks:
             end_time_str = homework_info.get("结束时间")
             try:
+                end_time_str = normalize_end_time(end_time_str) # 处理24:00 的特殊傻逼时间
                 end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S") if end_time_str else None
                 # 如果结束时间为0点0分0秒，将其调整为前一天晚上23点59分59秒
                 if end_time and end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
