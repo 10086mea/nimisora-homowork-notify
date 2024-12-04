@@ -44,19 +44,19 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
             end_time_str = homework_info.get("结束时间")
             try:
                 end_time_str = normalize_end_time(end_time_str) # 处理24:00 的特殊傻逼时间
-                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S") if end_time_str else None
+                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M") if end_time_str else None
                 # 如果结束时间为0点0分0秒，将其调整为前一天晚上23点59分59秒
                 if end_time and end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
                     end_time -= timedelta(seconds=1)
                     # 将调整后的时间重新格式化为字符串并更新到原始数据
-                    homework_info["结束时间"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
+                    homework_info["结束时间"] = end_time.strftime("%Y-%m-%d %H:%M")
             except ValueError:
-                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M") if end_time_str else None
+                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S") if end_time_str else None
                 # 再次检查0点0分的情况
                 if end_time and end_time.hour == 0 and end_time.minute == 0:
                     end_time -= timedelta(seconds=1)
                     # 将调整后的时间重新格式化为字符串并更新到原始数据
-                    homework_info["结束时间"] = end_time.strftime("%Y-%m-%d %H:%M")
+                    homework_info["结束时间"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
 
             # 检查作业是否未提交
             if homework_info["提交状态"] == "未提交" and end_time:
@@ -102,13 +102,13 @@ def compare_reminders(current_reminders, last_reminders):
     :param last_reminders: 上次保存的提醒内容
     :return: 布尔值，表示是否相同
     """
-    for reminder_type in ["urgent", "normal"]: # 忽略掉阈值外和未提交的作业
+    for reminder_type in ["urgent", "normal"]:
         current_set = {
-            (course_name, info.get("作业标题") or info.get("作业名称"), info.get("结束时间"), info.get("提交状态"))
+            (course_name, info.get("作业ID"), info.get("作业标题"), info.get("结束时间"), info.get("提交状态"))
             for course_name, info in current_reminders[reminder_type]
         }
         last_set = {
-            (course_name, info.get("作业标题") or info.get("作业名称"), info.get("结束时间"), info.get("提交状态"))
+            (course_name, info.get("作业ID"), info.get("作业标题"), info.get("结束时间"), info.get("提交状态"))
             for course_name, info in last_reminders[reminder_type]
         }
 
@@ -126,7 +126,7 @@ def save_reminders_to_csv(email_reminders, log_file_path, student_id):
     :param log_file_path: CSV 文件的保存路径
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
-    fieldnames = ["课程名称", "作业标题", "结束时间", "提交状态", "提醒类型"]
+    fieldnames = ["课程名称", "作业标题","作业ID", "结束时间", "提交状态", "提醒类型"]
 
     # 打开 CSV 文件并写入数据
     with open(f"{student_id}_{log_file_path}", mode='w', newline='', encoding='utf-8') as file:
@@ -148,6 +148,7 @@ def save_reminders_to_csv(email_reminders, log_file_path, student_id):
                 reminder_data = {
                     "课程名称": course_name,
                     "作业标题": homework_info.get("作业标题", ""),
+                    "作业ID" : homework_info.get("作业ID" , ""),
                     "结束时间": homework_info.get("结束时间", ""),
                     "提交状态": homework_info.get("提交状态", ""),
                     "提醒类型": reminder_type
@@ -170,6 +171,7 @@ def load_last_reminders(student_id, log_file_path):
                 reminder_type = row["提醒类型"]
                 reminders[reminder_type].append((row["课程名称"], {
                     "作业标题": row["作业标题"],
+                    "作业ID" : int(row["作业ID"]),#不转成字符串在比较时会变成int和str比较
                     "结束时间": row["结束时间"],
                     "提交状态": row["提交状态"]
                 }))

@@ -100,6 +100,7 @@ async def fetch_homework_data_for_course(
             formatted_homeworks = []
             for homework in homework_data.get("courseNoteList", []):
                 homework_info = {
+                    "作业ID":homework.get("id"),
                     "作业标题": homework.get("title"),
                     "创建日期": homework.get("create_date"),
                     "开放时间": homework.get("open_date"),

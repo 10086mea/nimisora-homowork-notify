@@ -83,7 +83,7 @@ async def check_and_send_reminders():
         try:
             student_id, reminder_thresholds = await fetch_and_process_user(user, log_file_path)
             user["last_notified"] = current_time
-            print(f"Processed homework data for student {student_id} with threshold {reminder_thresholds}")
+            print(f" {student_id}学生 阈值 {reminder_thresholds} 处理完毕")
         except Exception as e:
             error_trace = traceback.format_exc()
             with open('error.log', 'a') as f:
