@@ -46,23 +46,43 @@ def load_users_from_csv(file_path):
     return users
 
 
-def save_users_to_csv(file_path, users):
-    """将更新后的用户信息保存到CSV文件中，包含学号、邮箱、上次提醒时间和提醒阈值。"""
-    with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-        fieldnames = ["student_id", "email", "last_notified", "reminder_threshold_1", "reminder_threshold_2", "password_md5", "password_confirmed", "password_notified"]
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()
-        for user in users:
-            writer.writerow({
-                "student_id": user["student_id"],
-                "email": user["email"],
-                "last_notified": user["last_notified"].strftime("%Y-%m-%d %H:%M:%S") if user["last_notified"] else "",
-                "reminder_threshold_1": user["reminder_thresholds"][0],
-                "reminder_threshold_2": user["reminder_thresholds"][1],
-                "password_md5": user["password"],
-                "password_confirmed": user["confirmed"],
-                "password_notified": user["notified"]
-            })
+def save_users_to_csv(file_path, users_to_update):
+    """
+    更新CSV文件中的用户信息，只修改需要更新的用户记录
+    users_to_update: 需要更新的用户列表
+    """
+    try:
+        # 先读取当前文件中的最新数据
+        current_users = {}
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                current_users[row["student_id"]] = row
+
+        # 更新需要修改的用户信息
+        for user in users_to_update:
+            if user["student_id"] in current_users:
+                # 只更新动态变化的字段
+                current_users[user["student_id"]].update({
+                    "last_notified": user["last_notified"].strftime("%Y-%m-%d %H:%M:%S") if user[
+                        "last_notified"] else "",
+                    "password_confirmed": user["confirmed"],
+                    "password_notified": user["notified"]
+                })
+
+        # 写回文件
+        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            fieldnames = ["student_id", "email", "last_notified", "reminder_threshold_1",
+                          "reminder_threshold_2", "password_md5", "password_confirmed", "password_notified"]
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(current_users.values())
+
+        print(f"成功更新了 {len(users_to_update)} 个用户的信息")
+
+    except Exception as e:
+        print(colored(f"保存CSV文件时发生错误: {str(e)}", 'red'))
+        raise
 
 
 def login_and_fetch_data(base_url, student_id, user):
@@ -75,6 +95,7 @@ def login_and_fetch_data(base_url, student_id, user):
 
     semester_info = fetch_semester_info(session, base_url, jsessionid)
     user_info = fetch_user_info(session, base_url, jsessionid)
+    user["confirmed"] = 1
     course_list = fetch_course_list(session, base_url, jsessionid, semester_info["学期代码"])
     return session, user_info, course_list
 
