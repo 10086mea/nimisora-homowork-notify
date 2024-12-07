@@ -2,12 +2,171 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
 from datetime import datetime, timedelta
-from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAGE,MAIL_FROM_ADDRESS
+from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, KAWAII_IMAGE,MAIL_FROM_ADDRESS, SECRET_KEY, QAQ_IMAGE
 import base64
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
 
 import json
 import csv
 
+def encrypt_student_id(student_id, key):
+    """
+    使用AES加密学号
+    """
+    cipher = AES.new(key.encode('utf-8'), AES.MODE_CBC)
+    ct_bytes = cipher.encrypt(pad(student_id.encode('utf-8'), AES.block_size))
+    iv = base64.b64encode(cipher.iv).decode('utf-8')
+    ct = base64.b64encode(ct_bytes).decode('utf-8')
+    return f"{iv}:{ct}"
+
+
+def send_password_change_mail(student_id, user):
+    """
+    发送密码修改邮件
+    :param student_id: 学号
+    :param user: 用户信息字典
+    """
+    to_email = user["email"]
+    subject = "[新海天作业通知机] 智慧平台密码非默认密码，需要提交自定义密码的MD5值"
+
+    # AES加密密钥SECRET_KEY从配置文件获取
+    encrypted_id = encrypt_student_id(student_id, SECRET_KEY)
+
+    # 生成密码修改链接
+    password_change_link = f"https://your-domain.com/change_password?token={encrypted_id}"
+
+    # 打开哭哭新海天
+    with open(QAQ_IMAGE, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+    # HTML 邮件内容
+    body = f"""
+    <html>
+    <head>
+      <style>
+        body {{
+          font-family: Arial, sans-serif;
+          background-color: #fafafa;
+          color: #333;
+        }}
+        .container {{
+          max-width: 600px;
+          margin: 20px auto;
+          padding: 20px;
+          background-color: #ffffff;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          position: relative;
+        }}
+        .header {{
+          text-align: center;
+          margin-bottom: 20px;
+        }}
+        .header h2 {{
+          color: #4a90e2;
+          font-weight: bold;
+        }}
+        .content {{
+          margin-top: 20px;
+          line-height: 1.6;
+        }}
+        .change-password-button {{
+          display: inline-block;
+          padding: 12px 24px;
+          background-color: #4a90e2;
+          color: white;
+          text-decoration: none;
+          border-radius: 5px;
+          margin: 20px 0;
+          text-align: center;
+        }}
+        .change-password-button:hover {{
+          background-color: #357abd;
+        }}
+        .warning {{
+          margin-top: 20px;
+          padding: 10px;
+          border-left: 4px solid #ff9800;
+          background-color: #fff3e0;
+          border-radius: 5px;
+        }}
+        .footer {{
+          text-align: center;
+          font-size: 0.9em;
+          color: #888;
+          margin-top: 20px;
+        }}
+        @media (max-width: 600px) {{
+          .container {{
+            width: 100%;
+            padding: 10px;
+            border-radius: 0;
+          }}
+          .header h2 {{
+            font-size: 1.5em;
+          }}
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2>欧内该，请告诉瓦塔西正确的密码</h2>
+        </div>
+        <div class="content">
+          <p>尼尼！</p>
+          <p>不告诉我正确的密码，是没法使用作业通知机的哦！</p>
+          <div style="text-align: center;">
+            <a href="{password_change_link}" class="change-password-button">
+              提交密码的MD5值
+            </a>
+          </div>
+
+          <div class="warning">
+            <strong>注意事项：</strong>
+            <ul>
+              <li></li>
+              <li>通知机只需密码的MD5值</li>
+              <li>MD5值不可逆向恢复出原始密码</li>
+            </ul>
+          </div>
+
+          <p>如果上面的按钮无法点击，也可以复制以下链接到浏览器地址栏访问：</p>
+          <p style="word-break: break-all; color: #666;">
+            {password_change_link}
+          </p>
+        </div>
+        <div class="footer">
+          <p>此邮件由新海天发送，请勿回复喵~（回复了也没事）</p>
+        </div>
+
+          <br><br> <!-- 额外空行 -->
+          <br><br> <!-- 额外空行 -->
+          <br><br> <!-- 额外空行 -->
+        <div class="footer">
+        </div>
+        <img src="data:image/png;base64,{encoded_string}" alt="Q版人物图像" class="chibi-img">
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart()
+    msg['From'] = SMTP_USER
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
+    print(f"正在发送密码修改邮件给 {to_email}...")
+    try:
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+        print(f"成功发送密码修改邮件给 {to_email}")
+    except Exception as e:
+        if str(e) == "(-1, b'\\x00\\x00\\x00')":
+            print(f"成功发送密码修改邮件给 {to_email}，但收到非标准响应。")
+        else:
+            print(f"发送邮件失败：{e}")
 def normalize_end_time(end_time_str):#处理傻逼 24:00特殊时间
     if end_time_str and '24:00' in end_time_str:
         # 将24:00转换为下一天的00:00
@@ -25,15 +184,12 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
     :param homework_data_json: JSON格式的所有课程作业数据
     :param to_email: 用户邮箱，用于发送提醒
     :param reminder_threshold_hours: 提前多少小时提醒的阈值列表（第一个值为普通提醒阈值，第二个值为紧急提醒阈值）
-    :param last_notified: 上次通知时间，格式为 "%Y-%m-%d %H:%M:%S"
+    :param last_notified: 上次通知时间，格式为 "%Y-%m-%d %H:%M"
     :param log_file_path: 用于保存提醒内容的CSV文件路径
     :param student_id: 学生学号，用于根据学号保存不同的CSV文件
     """
     current_time = datetime.now()
     email_reminders = {"normal": [], "urgent": [], "out_of_threshold": [],"late":[]}  # 新增 "out_of_threshold","late"类别
-
-    # 将字符串形式的上次通知时间转换为 datetime 对象
-    last_notified_time = last_notified
 
     # 将JSON格式的作业数据解析为Python对象
     all_courses_homework_data = json.loads(homework_data_json)

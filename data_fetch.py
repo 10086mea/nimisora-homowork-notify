@@ -27,13 +27,27 @@ def fetch_semester_info(session, base_url, jsessionid):
     else:
         raise Exception("获取学期信息失败。")
 
+
 def fetch_user_info(session, base_url, jsessionid):
     """获取用户信息"""
     user_info_url = f"{base_url}/back/coursePlatform/userInfo.shtml?method=getUserInfo"
     headers = {"cookies": jsessionid}
     user_info_response = session.get(user_info_url, headers=headers)
-    if user_info_response.status_code == 200:
+
+    # 先检查登录状态
+    if "您还未登录，请您先登录" in user_info_response.text:
+        print("用户密码错误")
+        raise Exception("智慧平台返回文本：您还未登录，请您先登录")
+
+    # 尝试解析 JSON
+    try:
         user_info_data = user_info_response.json()
+    except ValueError as e:  # JSON 解码失败时会抛出 ValueError
+        print(f"响应内容不是有效的 JSON 格式")
+        raise Exception(f"解析用户信息失败: 响应内容不是有效的 JSON 格式。原始响应: {user_info_response.text[:200]}")
+
+    # 检查响应状态和数据
+    if user_info_response.status_code == 200 and user_info_data:
         user_info = user_info_data.get("userInfo", {})
         user_info_dict = {
             "学生编号": user_info.get("STU_NO"),
@@ -47,7 +61,7 @@ def fetch_user_info(session, base_url, jsessionid):
         print("用户信息:", user_info_dict)
         return user_info_dict
     else:
-        raise Exception("获取用户信息失败。")
+        raise Exception(f"获取用户信息失败: {user_info_response.text[:200]}")
 
 def fetch_course_list(session, base_url, jsessionid, xq_code):
     """获取课程列表"""
