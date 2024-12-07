@@ -6,7 +6,7 @@ SMTP_PORT = 465  # SMTP 服务器端口
 SMTP_USER = "your_email@qq.com"  # 你的邮箱地址
 SMTP_PASSWORD = "your_smtp_password"  # 你的 SMTP 密码
 CSV_FILE_PATH = 'user_data.csv'  # CSV文件路径
-log_file_path = 'class_log.csv'  # log文件路径
+log_file_path = '.\\homeworks'  # log文件路径
 # 应用程序配置
 MAX_REMIND_COUNT = 1  # 最多提醒次数
 KAWAII_IMAGE = "path/to/your/image.png"  # 右下角的二刺螈图片文件路径，例: "D:\\path\\to\\image.png"

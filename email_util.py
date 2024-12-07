@@ -129,7 +129,7 @@ def save_reminders_to_csv(email_reminders, log_file_path, student_id):
     fieldnames = ["课程名称", "作业标题","作业ID", "结束时间", "提交状态", "提醒类型"]
 
     # 打开 CSV 文件并写入数据
-    with open(f"{student_id}_{log_file_path}", mode='w', newline='', encoding='utf-8') as file:
+    with open(f"{log_file_path}\\{student_id}_class_log.csv", mode='w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
 
         # 写入表头
@@ -165,7 +165,7 @@ def load_last_reminders(student_id, log_file_path):
     """
     reminders = {"normal": [], "urgent": [],"out_of_threshold":[],"late":[]}
     try:
-        with open(f"{student_id}_{log_file_path}", mode='r', encoding='utf-8') as file:
+        with open(f"{log_file_path}\\{student_id}_class_log.csv", mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
                 reminder_type = row["提醒类型"]
