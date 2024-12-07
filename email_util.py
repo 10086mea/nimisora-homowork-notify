@@ -10,14 +10,25 @@ from Crypto.Util.Padding import pad
 import json
 import csv
 
+
 def encrypt_student_id(student_id, key):
     """
     使用AES加密学号
     """
-    cipher = AES.new(key.encode('utf-8'), AES.MODE_CBC)
-    ct_bytes = cipher.encrypt(pad(student_id.encode('utf-8'), AES.block_size))
+    # 确保密钥长度为32字节
+    key = key.encode('utf-8').ljust(32, b'\0')
+
+    # 创建AES cipher
+    cipher = AES.new(key, AES.MODE_CBC)
+
+    # 加密并填充
+    padded_data = pad(student_id.encode('utf-8'), AES.block_size, style='pkcs7')
+    ct_bytes = cipher.encrypt(padded_data)
+
+    # 编码IV和密文
     iv = base64.b64encode(cipher.iv).decode('utf-8')
     ct = base64.b64encode(ct_bytes).decode('utf-8')
+
     return f"{iv}:{ct}"
 
 
@@ -34,7 +45,7 @@ def send_password_change_mail(student_id, user):
     encrypted_id = encrypt_student_id(student_id, SECRET_KEY)
 
     # 生成密码修改链接
-    password_change_link = f"https://your-domain.com/change_password?token={encrypted_id}"
+    password_change_link = f"https://love.nimisora.icu/homework-notify/person.html?token={encrypted_id}"
 
     # 打开哭哭新海天
     with open(QAQ_IMAGE, "rb") as image_file:
@@ -105,6 +116,27 @@ def send_password_change_mail(student_id, user):
           .header h2 {{
             font-size: 1.5em;
           }}
+        .chibi-img {{
+          position: absolute;
+          bottom: 5%; /* 距离 container 底部的距离 */
+          right: 5%; /* 距离 container 右侧的距离 */
+          max-width: 24%; /* 控制缩放比例 */
+          height: auto;
+          opacity: 0.85;
+        }}
+            /* 移动设备样式 */
+        @media (max-width: 600px) {{
+          .container {{
+            width: 100%;
+            padding: 10px;
+            border-radius: 0; /* 在移动端去掉圆角以适应屏幕 */
+          }}
+          .chibi-img {{
+            max-width: 8%; /* 移动端缩小图片比例 */
+          }}
+          .header h2 {{
+            font-size: 1.5em;
+          }}
         }}
       </style>
     </head>
@@ -123,7 +155,7 @@ def send_password_change_mail(student_id, user):
           </div>
 
           <div class="warning">
-            <strong>注意事项：</strong>
+            <strong>声明：</strong>
             <ul>
               <li></li>
               <li>通知机只需密码的MD5值</li>
@@ -136,14 +168,12 @@ def send_password_change_mail(student_id, user):
             {password_change_link}
           </p>
         </div>
-        <div class="footer">
-          <p>此邮件由新海天发送，请勿回复喵~（回复了也没事）</p>
-        </div>
 
           <br><br> <!-- 额外空行 -->
           <br><br> <!-- 额外空行 -->
           <br><br> <!-- 额外空行 -->
         <div class="footer">
+            <p>此邮件由新海天发送，请勿回复喵~（回复了也没事）</p>
         </div>
         <img src="data:image/png;base64,{encoded_string}" alt="Q版人物图像" class="chibi-img">
     </body>
