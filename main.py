@@ -48,7 +48,7 @@ def load_users_from_csv(file_path):
 
 def save_users_to_csv(file_path, users_to_update):
     """
-    更新CSV文件中的用户信息，只修改需要更新的用户记录
+    更新CSV文件中的用户信息，只更新指定字段，保持其他字段不变
     users_to_update: 需要更新的用户列表
     """
     try:
@@ -57,18 +57,23 @@ def save_users_to_csv(file_path, users_to_update):
         with open(file_path, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
-                current_users[row["student_id"]] = row
+                current_users[(row["student_id"], row["email"])] = row
 
-        # 更新需要修改的用户信息
+        # 只更新current_users中存在的用户的指定字段
+        update_count = 0
         for user in users_to_update:
-            if user["student_id"] in current_users:
-                # 只更新动态变化的字段
-                current_users[user["student_id"]].update({
+            # 查找该学生ID的所有邮箱订阅
+            student_subscriptions = [key for key in current_users.keys() if key[0] == user["student_id"]]
+
+            # 更新该学生的所有邮箱订阅记录
+            for key in student_subscriptions:
+                current_users[key].update({
                     "last_notified": user["last_notified"].strftime("%Y-%m-%d %H:%M:%S") if user[
                         "last_notified"] else "",
                     "password_confirmed": user["confirmed"],
                     "password_notified": user["notified"]
                 })
+                update_count += 1
 
         # 写回文件
         with open(file_path, mode='w', newline='', encoding='utf-8') as file:
@@ -78,13 +83,11 @@ def save_users_to_csv(file_path, users_to_update):
             writer.writeheader()
             writer.writerows(current_users.values())
 
-        print(f"成功更新了 {len(users_to_update)} 个用户的信息")
+        print(f"成功更新了 {update_count} 个记录，去重后当前共有 {len(current_users)} 个用户记录")
 
     except Exception as e:
         print(colored(f"保存CSV文件时发生错误: {str(e)}", 'red'))
         raise
-
-
 def login_and_fetch_data(base_url, student_id, user):
     """主流程：初始化会话，登录并获取数据。"""
     session, jsessionid = initialize_session(base_url)
@@ -130,7 +133,7 @@ async def check_and_send_reminders():
     for user in users:
         student_id = user["student_id"]
         try:
-            if user["confirmed"] == -1:
+            if user["confirmed"] == -1 and user["notified"] == 1:
                 print(f"{student_id}的密码不正确，已跳过")
                 continue
             student_id, reminder_thresholds = await fetch_and_process_user(user, log_file_path)

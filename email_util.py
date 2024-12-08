@@ -13,20 +13,18 @@ import csv
 
 def encrypt_student_id(student_id, key):
     """
-    使用AES-256-CBC加密学号
+    使用AES-256-CBC加密学号，使用URL安全的Base64编码
     """
     key = key.encode('utf-8').ljust(32, b'\0')
-
-    # 明确指定AES-256-CBC
     cipher = AES.new(key, AES.MODE_CBC)
     padded_data = pad(student_id.encode('utf-8'), AES.block_size, style='pkcs7')
     ct_bytes = cipher.encrypt(padded_data)
 
-    iv = base64.b64encode(cipher.iv).decode('utf-8')
-    ct = base64.b64encode(ct_bytes).decode('utf-8')
+    # 使用URL安全的Base64编码
+    iv = base64.urlsafe_b64encode(cipher.iv).decode('utf-8')
+    ct = base64.urlsafe_b64encode(ct_bytes).decode('utf-8')
 
     return f"{iv}:{ct}"
-
 def send_password_change_mail(student_id, user):
     """
     发送密码修改邮件
@@ -543,9 +541,9 @@ def send_summary_email(email_reminders, to_email):
         else:
             print(f"发送邮件失败：{e}")
 if __name__ == "__main__":
-    student_id = 23114514
+    student_id = '232114514'
     encrypted_id = encrypt_student_id(student_id, SECRET_KEY)
 
     # 生成密码修改链接
-    password_change_link = f"https://love.nimisora.icu/homework-notify/person.html?token={encrypted_id}"
+    password_change_link = f"https://love.nimisora.icu/homework-notify/debug.php?token={encrypted_id}"
     print(password_change_link)
