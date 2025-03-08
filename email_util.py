@@ -263,7 +263,7 @@ def select_remind_homework(homework_data_json, to_email, reminder_threshold_hour
         # 保存新提醒内容到 CSV 文件
         save_reminders_to_csv(email_reminders, log_file_path, student_id)
         if(send_flag):
-            send_summary_email(email_reminders, to_email)
+            send_summary_email(email_reminders, to_email,student_id)
         print("紧急程度或普通提醒有变化，需要提醒")
         return email_reminders  # 返回提醒内容
     else:
@@ -359,12 +359,16 @@ def load_last_reminders(student_id, log_file_path):
         pass
     return reminders
 
-def send_summary_email(email_reminders, to_email):
+def send_summary_email(email_reminders, to_email,student_id):
     """
     发送电子邮件汇总给用户。
     """
     subject = "[新海天提醒] 即将到期的作业汇总"
 
+    encrypted_id = encrypt_student_id(student_id, SECRET_KEY)
+
+    # 生成密码修改链接
+    password_change_link = f"https://love.nimisora.icu/homework-notify/person.html?token={encrypted_id}"
     # 将图片文件读取为 Base64 编码字符串
     with open(KAWAII_IMAGE, "rb") as image_file:
         encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
@@ -422,6 +426,19 @@ def send_summary_email(email_reminders, to_email):
         border-radius: 5px;
         color: #808080;                 /* 灰色字体 */
         }}
+        .change-password-button {{
+          display: inline-block;
+          padding: 12px 24px;
+          background-color: #4a90e2;
+          color: white;
+          text-decoration: none;
+          border-radius: 5px;
+          margin: 20px 0;
+          text-align: center;
+        }}
+        .change-password-button:hover {{
+          background-color: #357abd;
+        }}
 
         .footer {{
           text-align: center;
@@ -456,8 +473,18 @@ def send_summary_email(email_reminders, to_email):
     <body>
       <div class="container">
         <div class="header">
-          <h2>即将到期的作业提醒</h2>
+          <h1>即将到期的作业提醒</h1>
         </div>
+        <div style="text-align: center;">
+            <a href="{password_change_link}" class="change-password-button">
+              个人作业中心
+            </a>
+          </div>
+
+          <p>如果上面的按钮无法点击，也可以复制以下链接到浏览器地址栏访问：</p>
+          <p style="word-break: break-all; color: #666;">
+            {password_change_link}
+          </p>
         <div class="content">
           <p>欧哈呦！</p>
           <p>尼尼有下列课程的作业即将到期：</p>
@@ -542,6 +569,7 @@ def send_summary_email(email_reminders, to_email):
             print(f"发送邮件失败：{e}")
 if __name__ == "__main__":
     student_id = '232114514'
+    # 生成密码修改链接
     encrypted_id = encrypt_student_id(student_id, SECRET_KEY)
 
     # 生成密码修改链接

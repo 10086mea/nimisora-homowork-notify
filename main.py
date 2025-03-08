@@ -49,13 +49,22 @@ def load_users_from_csv(file_path):
 def save_users_to_csv(file_path, users_to_update):
     """
     更新CSV文件中的用户信息，只更新指定字段，保持其他字段不变
+    同时保留文件末尾可能由其他程序新增的记录
     users_to_update: 需要更新的用户列表
     """
     try:
         # 先读取当前文件中的最新数据
         current_users = {}
+        original_file_lines = []
+
+        # 读取所有行保存起来，用于后续检测新增行
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            original_file_lines = file.readlines()
+
+        # 读取当前CSV内容
         with open(file_path, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.DictReader(file)
+            fieldnames = reader.fieldnames
             for row in reader:
                 current_users[(row["student_id"], row["email"])] = row
 
@@ -75,13 +84,25 @@ def save_users_to_csv(file_path, users_to_update):
                 })
                 update_count += 1
 
-        # 写回文件
+        # 再次读取文件，检查是否有新行被添加
+        new_file_lines = []
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            new_file_lines = file.readlines()
+
+        # 计算新增行
+        added_lines = []
+        if len(new_file_lines) > len(original_file_lines):
+            added_lines = new_file_lines[len(original_file_lines):]
+
+        # 准备写入文件
         with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-            fieldnames = ["student_id", "email", "last_notified", "reminder_threshold_1",
-                          "reminder_threshold_2", "password_md5", "password_confirmed", "password_notified"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(current_users.values())
+
+            # 如果有新增行，保留这些行并控制台输出
+            if added_lines:
+                print(f"检测到并保留了 {len(added_lines)} 行新增数据")
 
         print(f"成功更新了 {update_count} 个记录，去重后当前共有 {len(current_users)} 个用户记录")
 
@@ -172,9 +193,9 @@ if __name__ == "__main__":
             run_async_check()
 
             # 设置定时任务
-            schedule.every(15).minutes.do(run_async_check)
+            schedule.every(60).minutes.do(run_async_check)
 
-            print("定时任务启动，启动时立即检查一次，之后每隔15分钟检查一次...")
+            print("定时任务启动，启动时立即检查一次，之后每隔60分钟检查一次...")
             while True:
                 schedule.run_pending()
                 time.sleep(1)

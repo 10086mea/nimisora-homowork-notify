@@ -95,6 +95,7 @@ def perform_login(session, base_url, student_id, jsessionid, captcha,user, max_r
             if response.status_code == 200:
                 # 解码响应内容
                 content = response.content.decode('gbk')
+                print(content)
                 # 检查是否包含错误信息
                 if "alert('" in content:
                     # 提取alert中的错误信息
@@ -110,8 +111,12 @@ def perform_login(session, base_url, student_id, jsessionid, captcha,user, max_r
                         raise PasswordError(error_msg)
                 else:
                     print("登录成功")
+
+                    print(content)
                     return response
             else:
+                content = response.content.decode('gbk')
+                print(content)
                 print(f"请求失败，状态码: {response.status_code}，尝试第 {attempt + 1} 次。")
         except requests.RequestException as e: #仅捕获网络相关异常，密码异常继续抛出
             print(f"发生异常: {e}，尝试第 {attempt + 1} 次。")
