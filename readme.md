@@ -1,7 +1,7 @@
 # 介绍页
-[上条当咩的blog](https://love.nimisora.icu/archives/371)
+[上条当咩的blog](https://nimisora.icu/archives/371)
 # 订阅页面
-[新海天订阅页](https://love.nimisora.icu/homework-notify/)
+[新海天订阅页](https://nimisora.icu/homework-notify/)
 # 功能介绍
 - 自动抓取智慧课程平台的作业、课程报告、实验，当剩余时间不满阈值时发送提醒。
 - 将零点截止的作业-1s，截止日期显示改为前一晚23:59分
