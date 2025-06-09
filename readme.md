@@ -2,6 +2,7 @@
 # 最新通知
 # 最新通知
 - 本项目已报废，智慧课程平台修复了验证码bug，并拉黑了作业通知机服务器IP
+- 请转向油猴脚本[新海天帮你列智慧教学平台作业清单](https://greasyfork.org/zh-CN/scripts/538889-%E6%96%B0%E6%B5%B7%E5%A4%A9%E5%B8%AE%E4%BD%A0%E5%88%97%E6%99%BA%E6%85%A7%E6%95%99%E5%AD%A6%E5%B9%B3%E5%8F%B0%E4%BD%9C%E4%B8%9A%E6%B8%85%E5%8D%95)
 # 介绍页
 [上条当咩的blog](https://nimisora.icu/archives/371)
 # 订阅页面
