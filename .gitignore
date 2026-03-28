@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dependencies
+venv/
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# Config
+config.py

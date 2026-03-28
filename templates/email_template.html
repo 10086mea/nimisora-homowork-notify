@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fafafa;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      position: relative;
+    }
+    .header h1 {
+      color: #4a90e2;
+      font-weight: bold;
+    }
+    .course {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-left: 4px solid #4a90e2;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+    }
+    .urgent-course {
+      border-left-color: #f44336; /* Red for urgent reminders */
+      background-color: #ffebee;
+    }
+    .normal-course {
+      border-left-color: #ff9800; /* Orange for normal reminders */
+      background-color: #fff3e0;
+    }
+    .safe-course {
+      border-left-color: #4CAF50; /* Green for safe ones */
+      background-color: #e8f5e9;
+    }
+    .trigger-section {
+        margin-bottom: 20px;
+    }
+    hr {
+        border: none;
+        border-top: 1px solid #eee;
+        margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>作业提醒</h1>
+    </div>
+    <div class="content">
+      <p>您好, {{ user.student_id }}!</p>
+
+      {% if hws_to_remind %}
+      <div class="trigger-section">
+        <p><strong>本次提醒由以下即将到期的作业触发：</strong></p>
+        {% for hw in hws_to_remind %}
+        <div class="course urgent-course">
+            <strong>课程：</strong> {{ hw.course_name }}<br>
+            <strong>作业标题：</strong> {{ hw.title }}<br>
+            <strong>截止时间：</strong> {{ hw.end_time.strftime('%Y-%m-%d %H:%M') }}
+        </div>
+        {% endfor %}
+      </div>
+      <hr>
+      {% endif %}
+
+      <p>截至目前，您所有未提交的作业如下：</p>
+      {% for hw in all_homework %}
+        {% set hours_left = (hw.end_time - now).total_seconds() / 3600 %}
+        {% set style_class = 'safe-course' %}
+        {% if hours_left <= user.reminder_threshold_2 %}
+            {% set style_class = 'urgent-course' %}
+        {% elif hours_left <= user.reminder_threshold_1 %}
+            {% set style_class = 'normal-course' %}
+        {% endif %}
+        <div class="course {{ style_class }}">
+            <strong>课程：</strong> {{ hw.course_name }}<br>
+            <strong>作业标题：</strong> {{ hw.title }}<br>
+            <strong>截止时间：</strong> {{ hw.end_time.strftime('%Y-%m-%d %H:%M') }} (剩余 {{ "%.1f"|format(hours_left) }} 小时)
+        </div>
+      {% endfor %}
+      <p>请及时完成！</p>
+    </div>
+  </div>
+</body>
+</html>

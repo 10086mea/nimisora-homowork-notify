@@ -1,0 +1,22 @@
+# config.py.template
+
+# SMTP Configuration
+SMTP_SERVER = "smtp.qq.com"
+SMTP_PORT = 465
+SMTP_USER = "your_email@example.com"
+SMTP_PASSWORD = "your_email_password"
+MAIL_FROM_ADDRESS = "your_email@example.com"
+
+# Database Configuration
+# Make sure to install pymysql: pip install pymysql
+DATABASE_URL = "mysql+pymysql://user:password@host/database_name"
+
+# Web Service Configuration
+BASE_URL = "http://123.121.147.7:88/ve"
+SESSION_URL = "http://123.121.147.7:88/ve/back/coursePlatform/message.shtml?method=getArticleList"
+
+# Captcha Configuration
+CAPTCHA_MODEL_PATH = "captcha/multi_head_cnn_best.pth"
+
+# Other
+DEFAULT_PASSWORD_PREFIX = "Bjtu@"
